@@ -9,7 +9,7 @@ function Counter({ id, value, handleDecrement, handleIncrement }) {
           id={`${id}-decrement`}
           className="text-4xl disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={handleDecrement}
-          disabled={value === 0}
+          disabled={value === 1}
         >
           ⬇️
         </button>
@@ -20,7 +20,7 @@ function Counter({ id, value, handleDecrement, handleIncrement }) {
           id={`${id}-increment`}
           className="text-4xl disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={handleIncrement}
-          disabled={value === 59}
+          disabled={value === 60}
         >
           ⬆️
         </button>

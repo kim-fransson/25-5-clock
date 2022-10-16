@@ -20,13 +20,19 @@ const DEFAULT_STATES = {
 const counterReducer = (state, { type }) => {
   switch (type) {
     case COUNTER_ACTIONS.BREAK_INCREMENT:
-      return { ...state, breakLength: state.breakLength++ };
+      return { ...state, breakLength: state.breakLength + 1 };
     case COUNTER_ACTIONS.BREAK_DECREMENT:
-      return { ...state, breakLength: state.breakLength-- };
+      return { ...state, breakLength: state.breakLength - 1 };
     case COUNTER_ACTIONS.SESSION_INCREMENT:
-      return { ...state, sessionLength: state.sessionLength++ };
+      return {
+        ...state,
+        sessionLength: state.sessionLength + 1,
+      };
     case COUNTER_ACTIONS.SESSION_DECREMENT:
-      return { ...state, sessionLength: state.sessionLength-- };
+      return {
+        ...state,
+        sessionLength: state.sessionLength - 1,
+      };
     case CLOCK_ACTIONS.RESET:
       return DEFAULT_STATES;
   }
@@ -35,10 +41,7 @@ const counterReducer = (state, { type }) => {
 function Clock() {
   const [{ breakLength, sessionLength }, dispatch] = useReducer(
     counterReducer,
-    {
-      breakLength: 5,
-      sessionLength: 25,
-    }
+    DEFAULT_STATES
   );
 
   return (
@@ -71,7 +74,7 @@ function Clock() {
           Session
         </p>
         <span id="time-left" className="text-2xl">
-          25:00
+          {sessionLength}:00
         </span>
       </div>
       <div className="gap-4 col-span-full flex justify-center">
