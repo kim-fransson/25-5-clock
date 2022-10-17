@@ -64,7 +64,7 @@ const counterReducer = (state, { type, payload }) => {
 };
 
 function Clock() {
-  const [label, setLabel] = useState("Break");
+  const [label, setLabel] = useState("Session");
   const [isDone, setIsDone] = useState(false);
   const [{ breakLength, sessionLength }, dispatch] = useReducer(
     counterReducer,
@@ -72,7 +72,6 @@ function Clock() {
   );
 
   useEffect(() => {
-    console.log(`${timer.hours}:${timer.seconds}`);
     if (isDone) {
       playBeep();
       if (label === "Session") {
