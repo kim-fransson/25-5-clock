@@ -1,4 +1,4 @@
-function Counter({ id, value, handleDecrement, handleIncrement }) {
+function Counter({ disabled, id, value, handleDecrement, handleIncrement }) {
   return (
     <div className="col-span-2 flex gap-1 flex-col items-center">
       <p id={`${id}-label`} className="text-xl capitalize">
@@ -9,7 +9,7 @@ function Counter({ id, value, handleDecrement, handleIncrement }) {
           id={`${id}-decrement`}
           className="text-4xl disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={handleDecrement}
-          disabled={value === 1}
+          disabled={disabled || value <= 1}
         >
           ⬇️
         </button>
@@ -20,7 +20,7 @@ function Counter({ id, value, handleDecrement, handleIncrement }) {
           id={`${id}-increment`}
           className="text-4xl disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={handleIncrement}
-          disabled={value === 60}
+          disabled={disabled || value >= 60}
         >
           ⬆️
         </button>
