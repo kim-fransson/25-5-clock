@@ -1,7 +1,5 @@
-import { useEffect, useReducer, useState } from "react";
-import { useTimer } from "react-timer-hook";
+import { useEffect, useReducer, useRef } from "react";
 
-import beep from "../assets/beep-beep.wav";
 import Counter from "./Counter";
 
 const COUNTER_ACTIONS = {
@@ -13,85 +11,137 @@ const COUNTER_ACTIONS = {
 
 const CLOCK_ACTIONS = {
   RESET: "reset",
+  TOGGLE_TIMER: "toggle-timer",
+};
+
+const INTERVAL_ACTIONS = {
+  SECOND_DECREMENT: "second-decrement",
 };
 
 const DEFAULT_STATES = {
   breakLength: 5,
   sessionLength: 25,
+  remainingTime: 25 * 60,
+  isRunning: false,
+  mode: "Session",
 };
 
 const counterReducer = (state, { type, payload }) => {
   switch (type) {
     case COUNTER_ACTIONS.BREAK_INCREMENT:
       const breakLengthIncr = state.breakLength + 1;
-      if (payload.label === "Break") {
-        payload.timer.restart(getStartTime(breakLengthIncr), false);
+      if (breakLengthIncr > 60) {
+        return state;
       }
-      return { ...state, breakLength: breakLengthIncr };
+      return {
+        ...state,
+        breakLength: breakLengthIncr,
+        remainingTime:
+          payload.mode === "Break" ? breakLengthIncr * 60 : state.remainingTime,
+      };
     case COUNTER_ACTIONS.BREAK_DECREMENT:
       const breakLengthDecr = state.breakLength - 1;
-      if (payload.label === "Break") {
-        payload.timer.restart(getStartTime(breakLengthDecr), false);
+      if (breakLengthDecr < 1) {
+        return state;
       }
       return {
         ...state,
         breakLength: breakLengthDecr,
+        remainingTime:
+          payload.mode === "Break" ? breakLengthDecr * 60 : state.remainingTime,
       };
     case COUNTER_ACTIONS.SESSION_INCREMENT:
       const sessionLengthIncr = state.sessionLength + 1;
-      if (payload.label === "Session") {
-        payload.timer.restart(getStartTime(sessionLengthIncr), false);
+      if (sessionLengthIncr > 60) {
+        return state;
       }
       return {
         ...state,
         sessionLength: sessionLengthIncr,
+        remainingTime:
+          payload.mode === "Session"
+            ? sessionLengthIncr * 60
+            : state.remainingTime,
       };
     case COUNTER_ACTIONS.SESSION_DECREMENT:
       const sessionLengthDecr = state.sessionLength - 1;
-      if (payload.label === "Session") {
-        payload.timer.restart(getStartTime(sessionLengthDecr), false);
+      if (sessionLengthDecr < 1) {
+        return state;
       }
+
       return {
         ...state,
         sessionLength: sessionLengthDecr,
+        remainingTime:
+          payload.mode === "Session"
+            ? sessionLengthDecr * 60
+            : state.remainingTime,
       };
     case CLOCK_ACTIONS.RESET:
-      stopBeep();
-      payload.timer.restart(getDefaultSessionTime(), false);
-      payload.setLabel("Session");
+      payload.alarm.current.pause();
+      payload.alarm.current.currentTime = 0;
       return DEFAULT_STATES;
+    case INTERVAL_ACTIONS.SECOND_DECREMENT:
+      if (state.remainingTime === 0) {
+        payload.alarm.current.currentTime = 0;
+        payload.alarm.current.play();
+        const currentMode = state.mode;
+        return {
+          ...state,
+          mode: currentMode === "Session" ? "Break" : "Session",
+          remainingTime:
+            currentMode === "Session"
+              ? state.breakLength * 60
+              : state.sessionLength * 60,
+        };
+      }
+      return {
+        ...state,
+        remainingTime: state.remainingTime - 1,
+      };
+    case CLOCK_ACTIONS.TOGGLE_TIMER:
+      return {
+        ...state,
+        isRunning: !state.isRunning,
+      };
   }
 };
 
 function Clock() {
-  const [label, setLabel] = useState("Session");
-  const [isDone, setIsDone] = useState(false);
-  const [{ breakLength, sessionLength }, dispatch] = useReducer(
-    counterReducer,
-    DEFAULT_STATES
-  );
+  const alarm = useRef();
 
-  useEffect(() => {
-    if (isDone) {
-      playBeep();
-      if (label === "Session") {
-        setLabel("Break");
-        timer.restart(getDefaultBreakTime(), true);
-      } else {
-        setLabel("Session");
-        timer.restart(getDefaultSessionTime(), true);
+  const [
+    { breakLength, sessionLength, remainingTime, isRunning, mode },
+    dispatch,
+  ] = useReducer(counterReducer, DEFAULT_STATES);
+
+  // move to own file
+  const useInterval = (callback, delay) => {
+    const callbackRef = useRef();
+
+    useEffect(() => {
+      callbackRef.current = callback;
+    }, [callback]);
+
+    useEffect(() => {
+      if (delay !== null) {
+        let id = setInterval(callbackRef.current, delay);
+        return () => clearInterval(id);
       }
-      setIsDone(false);
-    }
-  }, [isDone]);
+    }, [delay]);
+  };
 
-  const timer = useTimer({
-    expiryTimestamp: getDefaultSessionTime(),
-    autoStart: false,
-    onExpire: () => {
-      setIsDone(true);
+  useInterval(
+    () => {
+      if (isRunning) {
+        dispatch({
+          type: INTERVAL_ACTIONS.SECOND_DECREMENT,
+          payload: { alarm },
+        });
+      }
     },
-  });
+    isRunning ? 1000 : null
+  );
 
   return (
     <div className="border-4 gap-y-4 rounded-lg shadow-lg bg-slate-700 border-gray-900 py-4 mx-auto max-w-[500px] grid-cols-4 grid text-white">
@@ -99,54 +149,52 @@ function Clock() {
         25 + 5 <span className="font-semibold text-red-600">Clock</span>
       </h1>
       <Counter
-        disabled={timer.isRunning}
+        disabled={isRunning}
         id="break"
         value={breakLength}
         handleDecrement={() =>
           dispatch({
             type: COUNTER_ACTIONS.BREAK_DECREMENT,
-            payload: { timer, label },
+            payload: { mode },
           })
         }
         handleIncrement={() =>
           dispatch({
             type: COUNTER_ACTIONS.BREAK_INCREMENT,
-            payload: { timer, label },
+            payload: { mode },
           })
         }
       />
       <Counter
-        disabled={timer.isRunning}
+        disabled={isRunning}
         id="session"
         value={sessionLength}
         handleDecrement={() =>
           dispatch({
             type: COUNTER_ACTIONS.SESSION_DECREMENT,
-            payload: { timer, label },
+            payload: { mode },
           })
         }
         handleIncrement={() =>
           dispatch({
             type: COUNTER_ACTIONS.SESSION_INCREMENT,
-            payload: { timer, label },
+            payload: { mode },
           })
         }
       />
       <div className="col-span-full flex flex-col items-center border-4 rounded-full w-40 h-40 justify-center mx-auto">
         <p id="timer-label" className="text-3xl">
-          {label}
+          {mode}
         </p>
         <span id="time-left" className="text-2xl">
-          {display(timer)}
+          {display(remainingTime)}
         </span>
       </div>
       <div className="gap-4 col-span-full flex justify-center">
         <button
           id="start_stop"
           className="text-4xl"
-          onClick={() => {
-            toggle(timer);
-          }}
+          onClick={() => dispatch({ type: CLOCK_ACTIONS.TOGGLE_TIMER })}
         >
           ⏯
         </button>
@@ -154,45 +202,29 @@ function Clock() {
           id="reset"
           className="text-4xl"
           onClick={() =>
-            dispatch({
-              type: CLOCK_ACTIONS.RESET,
-              payload: { timer, setLabel },
-            })
+            dispatch({ type: CLOCK_ACTIONS.RESET, payload: { alarm } })
           }
         >
           ⟳
         </button>
       </div>
-      <audio id="beep" src={beep} autoPlay={false}></audio>
+      <audio
+        id="beep"
+        ref={alarm}
+        src="https://raw.githubusercontent.com/freeCodeCamp/cdn/master/build/testable-projects-fcc/audio/BeepSound.wav"
+        type="audio"
+      ></audio>
     </div>
   );
 }
 
-const playBeep = () => {
-  document.getElementById("beep").play();
-};
-
-const stopBeep = () => {
-  const audio = document.getElementById("beep");
-  audio.pause();
-  audio.currentTime = 0;
-};
-
-const toggle = (timer) => {
-  timer.isRunning ? timer.pause() : timer.resume();
-};
-
-const display = (timer) => {
-  return `${displayMinutes(timer.hours, timer.minutes)}:${displaySeconds(
-    timer.seconds
+const display = (seconds) => {
+  return `${displayMinutes(parseInt(seconds / 60, 10))}:${displaySeconds(
+    parseInt(seconds, 10)
   )}`;
 };
 
-const displayMinutes = (hours, minutes) => {
-  if (hours === 1) {
-    return "60";
-  }
-
+const displayMinutes = (minutes) => {
   if (minutes < 10) {
     return `0${minutes}`;
   }
@@ -201,27 +233,11 @@ const displayMinutes = (hours, minutes) => {
 };
 
 const displaySeconds = (seconds) => {
-  return seconds < 10 ? `0${seconds}` : seconds;
-};
-
-const getDefaultSessionTime = () => {
-  return getStartTime(DEFAULT_STATES.sessionLength);
-  // const time = new Date();
-  // time.setSeconds(time.getSeconds() + 5);
-  // return time;
-};
-
-const getDefaultBreakTime = () => {
-  return getStartTime(DEFAULT_STATES.breakLength);
-  // const time = new Date();
-  // time.setSeconds(time.getSeconds() + 5);
-  // return time;
-};
-
-const getStartTime = (minutes) => {
-  const time = new Date();
-  time.setMinutes(time.getMinutes() + minutes);
-  return time;
+  const format = seconds % 60;
+  if (format === 0) {
+    return "00";
+  }
+  return format < 10 ? `0${format}` : format;
 };
 
 export default Clock;
